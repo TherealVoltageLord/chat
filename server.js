@@ -68,7 +68,17 @@ const authenticate = (req, res, next) => {
   }
 };
 
+app.use(express.static(__dirname));
+
 // Routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/chat', authenticate, (req, res) => {
+  res.sendFile(path.join(__dirname, 'chat.html'));
+});
+
 app.post('/register', [
   body('username').isLength({ min: 3, max: 20 }).trim().escape(),
   body('password').isLength({ min: 8 })
@@ -263,9 +273,6 @@ function broadcastPresence(userId, isOnline) {
     }
   });
 }
-
-// Static files
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Error handling
 app.use((err, req, res, next) => {
