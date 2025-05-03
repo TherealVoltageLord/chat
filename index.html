@@ -4,7 +4,7 @@
     <title>Voltura - Welcome</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
+         :root {
             --primary-color: #25D366;
             --background: #f0f2f5;
             --header-bg: #008069;
@@ -121,32 +121,46 @@
             e.preventDefault();
             const form = e.target;
             const errorDiv = form.querySelector('.error');
-            const [username, password] = Array.from(form.elements).slice(0, 2);
+            const inputs = Array.from(form.querySelectorAll('input'));
+            const [username, password] = inputs.map(input => input.value);
             
+            errorDiv.textContent = '';
             errorDiv.style.display = 'none';
-            form.querySelector('button').disabled = true;
+            const button = form.querySelector('button');
+            button.disabled = true;
 
             try {
                 const response = await fetch(`/${action}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: username.value,
-                        password: password.value
-                    })
+                    body: JSON.stringify({ username, password })
                 });
 
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Request failed');
+                const data = await response.json().catch(() => null);
+                
+                if (!response.ok) {
+                    const errorMessage = data?.error || data?.message || 'Request failed';
+                    throw new Error(errorMessage);
+                }
 
-                localStorage.setItem('voltura-token', data.token);
-                localStorage.setItem('currentUser', JSON.stringify(data));
-                window.location.href = 'chat.html';
+                if (action === 'register') {
+                    // Clear form and show success message
+                    form.reset();
+                    showForm('login');
+                    alert('Registration successful! Please login.');
+                } else {
+                    // Handle login
+                    if (!data.token) throw new Error('Missing authentication token');
+                    
+                    localStorage.setItem('voltura-token', data.token);
+                    localStorage.setItem('currentUser', JSON.stringify(data));
+                    window.location.href = 'chat.html';
+                }
             } catch (err) {
                 errorDiv.textContent = err.message;
                 errorDiv.style.display = 'block';
             } finally {
-                form.querySelector('button').disabled = false;
+                button.disabled = false;
             }
         }
     </script>
