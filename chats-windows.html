@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voltura - Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #25D366;
+            --background: #e5ddd6;
+            --header-bg: #008069;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: var(--header-bg);
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .back-button {
+            cursor: pointer;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: var(--background);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 12px;
+            border-radius: 8px;
+            background: white;
+            position: relative;
+        }
+
+        .message.outgoing {
+            background: #DCF8C6;
+            align-self: flex-end;
+        }
+
+        .message-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .input-container {
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 16px;
+        }
+
+        .send-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .typing-indicator {
+            padding: 0 20px;
+            color: #666;
+            font-style: italic;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-header">
+        <i class="fas fa-arrow-left back-button" onclick="window.history.back()"></i>
+        <div>${JSON.parse(localStorage.getItem('currentChat')).username}</div>
+    </div>
+
+    <div class="messages-container" id="messagesContainer">
+        <!-- Messages will be loaded here -->
+    </div>
+
+    <div class="typing-indicator" id="typingIndicator"></div>
+
+    <div class="input-container">
+        <input type="text" 
+               class="message-input" 
+               placeholder="Type a message..." 
+               id="messageInput"
+               onkeypress="handleKeyPress(event)">
+        <button class="send-button" onclick="sendMessage()">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </div>
+
+    <script>
+        let ws;
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        let currentChat = JSON.parse(localStorage.getItem('currentChat'));
+        let typingTimeout;
+
+        window.onload = async () => {
+            if (!currentUser || !currentChat) window.location.href = '/chat.html';
+            
+            // Connect to WebSocket
+            ws = new WebSocket(`ws://${window.location.host}?token=${localStorage.getItem('voltura-token')}`);
+            
+            // Load message history
+            await loadMessages();
+            
+            // WebSocket handlers
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+        };
+
+        async function loadMessages() {
+            try {
+                const response = await fetch(`/messages?contact=${currentChat.id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('voltura-token')}`
+                    }
+                });
+                const messages = await response.json();
+                renderMessages(messages);
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        function renderMessages(messages) {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = messages.map(msg => `
+                <div class="message ${msg.sender_id === currentUser.id ? 'outgoing' : ''}">
+                    <div class="message-content">${msg.content}</div>
+                    <div class="message-info">
+                        <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
+                        ${msg.sender_id === currentUser.id ? 
+                            `<span>${msg.status === 'read' ? '✓✓' : '✓'}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            } else {
+                // Typing indicator
+                ws.send(JSON.stringify({
+                    type: 'typing',
+                    recipient: currentChat.id
+                }));
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    document.getElementById('typingIndicator').textContent = '';
+                }, 2000);
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (content) {
+                ws.send(JSON.stringify({
+                    type: 'message',
+                    content: content,
+                    recipient: currentChat.id
+                }));
+                input.value = '';
+            }
+        }
+
+        function handleMessage(data) {
+            if (data.type === 'message') {
+                const container = document.getElementById('messagesContainer');
+                const isOutgoing = data.sender_id === currentUser.id;
+                
+                container.innerHTML += `
+                    <div class="message ${isOutgoing ? 'outgoing' : ''}">
+                        <div class="message-content">${data.content}</div>
+                        <div class="message-info">
+                            <span>${new Date(data.timestamp).toLocaleTimeString()}</span>
+                            ${isOutgoing ? `<span>${data.status === 'read' ? '✓✓' : '✓'}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                container.scrollTop = container.scrollHeight;
+            }
+            else if (data.type === 'typing') {
+                document.getElementById('typingIndicator').textContent = `${currentChat.username} is typing...`;
+            }
+        }
+    </script>
+</body>
+</html>
