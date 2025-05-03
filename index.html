@@ -4,7 +4,7 @@
     <title>Voltura - Welcome</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-         :root {
+        :root {
             --primary-color: #25D366;
             --background: #f0f2f5;
             --header-bg: #008069;
@@ -41,6 +41,7 @@
             cursor: pointer;
             transition: all 0.3s;
             color: #666;
+            position: relative;
         }
 
         .tab.active {
@@ -52,10 +53,23 @@
             padding: 25px;
         }
 
+        .input-container {
+            position: relative;
+            margin: 15px 0;
+        }
+
+        .input-container i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 16px;
+        }
+
         input {
             width: 100%;
-            padding: 12px;
-            margin: 10px 0;
+            padding: 12px 12px 12px 40px;
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 16px;
@@ -71,6 +85,7 @@
             cursor: pointer;
             font-size: 16px;
             margin-top: 15px;
+            transition: opacity 0.3s;
         }
 
         button:hover {
@@ -82,6 +97,12 @@
             font-size: 14px;
             margin-top: 5px;
             display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .error i {
+            font-size: 16px;
         }
     </style>
 </head>
@@ -94,17 +115,39 @@
         
         <div class="form-container">
             <form id="loginForm" onsubmit="handleAuth(event, 'login')">
-                <input type="text" placeholder="Username" required>
-                <input type="password" placeholder="Password" required>
-                <div class="error" id="loginError"></div>
-                <button type="submit">Sign In</button>
+                <div class="input-container">
+                    <i class="fas fa-user"></i>
+                    <input type="text" placeholder="Username" required>
+                </div>
+                <div class="input-container">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" placeholder="Password" required>
+                </div>
+                <div class="error" id="loginError">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span></span>
+                </div>
+                <button type="submit">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
             </form>
 
             <form id="registerForm" style="display: none;" onsubmit="handleAuth(event, 'register')">
-                <input type="text" placeholder="Username" required>
-                <input type="password" placeholder="Password" required>
-                <div class="error" id="registerError"></div>
-                <button type="submit">Create Account</button>
+                <div class="input-container">
+                    <i class="fas fa-user"></i>
+                    <input type="text" placeholder="Username" required>
+                </div>
+                <div class="input-container">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" placeholder="Password" required>
+                </div>
+                <div class="error" id="registerError">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span></span>
+                </div>
+                <button type="submit">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
             </form>
         </div>
     </div>
@@ -113,7 +156,9 @@
         function showForm(formType) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('form').forEach(form => form.style.display = 'none');
-            document.getElementById(`${formType}Form`).style.display = 'block';
+            
+            const targetForm = document.getElementById(`${formType}Form`);
+            targetForm.style.display = 'block';
             event.target.classList.add('active');
         }
 
@@ -121,44 +166,54 @@
             e.preventDefault();
             const form = e.target;
             const errorDiv = form.querySelector('.error');
+            const errorSpan = errorDiv.querySelector('span');
             const inputs = Array.from(form.querySelectorAll('input'));
-            const [username, password] = inputs.map(input => input.value);
             
-            errorDiv.textContent = '';
+            // Reset error state
             errorDiv.style.display = 'none';
+            errorSpan.textContent = '';
             const button = form.querySelector('button');
             button.disabled = true;
 
             try {
+                const formData = {
+                    username: inputs[0].value,
+                    password: inputs[1].value
+                };
+
                 const response = await fetch(`/${action}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify(formData)
                 });
 
-                const data = await response.json().catch(() => null);
-                
+                const data = await response.json();
+
                 if (!response.ok) {
-                    const errorMessage = data?.error || data?.message || 'Request failed';
-                    throw new Error(errorMessage);
+                    throw new Error(data.error || data.message || 'Request failed');
                 }
 
                 if (action === 'register') {
-                    // Clear form and show success message
+                    // Handle successful registration
                     form.reset();
                     showForm('login');
-                    alert('Registration successful! Please login.');
+                    errorSpan.textContent = 'Registration successful! Please login.';
+                    errorDiv.style.color = 'var(--primary-color)';
+                    errorDiv.style.display = 'flex';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 3000);
                 } else {
-                    // Handle login
-                    if (!data.token) throw new Error('Missing authentication token');
-                    
+                    // Handle login success
                     localStorage.setItem('voltura-token', data.token);
                     localStorage.setItem('currentUser', JSON.stringify(data));
                     window.location.href = 'chat.html';
                 }
+
             } catch (err) {
-                errorDiv.textContent = err.message;
-                errorDiv.style.display = 'block';
+                errorSpan.textContent = err.message;
+                errorDiv.style.color = '#ff4444';
+                errorDiv.style.display = 'flex';
             } finally {
                 button.disabled = false;
             }
