@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: voltura
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /data/voltura.db
+    disk:
+      name: voltura-data
+      mountPath: /data
+      sizeGB: 1
