@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voltura - Chats</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #25D366;
+            --background: #f0f2f5;
+            --header-bg: #008069;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--header-bg);
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .search-bar {
+            padding: 15px;
+            background: white;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 15px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        .contacts-list {
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+
+        .contact-item:hover {
+            background: #f5f5f5;
+        }
+
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-right: 15px;
+        }
+
+        .contact-info {
+            flex: 1;
+        }
+
+        .contact-name {
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+
+        .last-message {
+            color: #666;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+        }
+
+        .online-status {
+            width: 12px;
+            height: 12px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="avatar">${JSON.parse(localStorage.currentUser).username[0]}</div>
+        <div>Voltura Messenger</div>
+    </div>
+
+    <div class="search-bar">
+        <div style="position: relative;">
+            <input type="text" 
+                   class="search-input" 
+                   placeholder="Search contacts..."
+                   id="searchInput"
+                   oninput="searchContacts(this.value)">
+            <i class="fas fa-search" style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); color: #666;"></i>
+        </div>
+    </div>
+
+    <div class="contacts-list" id="contactsList">
+        <!-- Contacts will be loaded here -->
+    </div>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        window.onload = async () => {
+            if (!currentUser) window.location.href = '/';
+            await loadContacts();
+        };
+
+        async function loadContacts() {
+            try {
+                const response = await fetch('/users', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('voltura-token')}`
+                    }
+                });
+                const contacts = await response.json();
+                renderContacts(contacts);
+            } catch (error) {
+                console.error('Error loading contacts:', error);
+            }
+        }
+
+        function renderContacts(contacts) {
+            const container = document.getElementById('contactsList');
+            container.innerHTML = contacts.map(contact => `
+                <div class="contact-item" onclick="openChat('${contact.id}', '${contact.username}')">
+                    <div class="avatar">${contact.username[0].toUpperCase()}</div>
+                    <div class="contact-info">
+                        <div class="contact-name">${contact.username}</div>
+                        <div class="last-message">${contact.lastMessage || 'Start a conversation'}</div>
+                    </div>
+                    ${contact.online ? '<div class="online-status"></div>' : ''}
+                </div>
+            `).join('');
+        }
+
+        async function searchContacts(query) {
+            try {
+                const response = await fetch(`/users?search=${encodeURIComponent(query)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('voltura-token')}`
+                    }
+                });
+                const results = await response.json();
+                renderContacts(results);
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        function openChat(contactId, username) {
+            localStorage.setItem('currentChat', JSON.stringify({ id: contactId, username }));
+            window.location.href = 'chats-windows.html';
+        }
+    </script>
+</body>
+</html>
